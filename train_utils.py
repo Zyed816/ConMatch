@@ -262,7 +262,7 @@ def get_optimizer_con(net, optim_name='SGD', lr=0.1, lr_con=0.1, momentum=0.9, w
     per_param_args = [{'params': decay, 'lr': lr},
                       {'params': no_decay, 'weight_decay': 0.0, 'lr': lr},
                       {'params': decay_con, 'lr': lr_con},
-                      {'params': no_decay_con, 'wegiht_deacy': 0.0, 'lr': lr_con}
+                      {'params': no_decay_con, 'weight_decay': 0.0, 'lr': lr_con}
                      ]
     if optim_name == 'SGD':
         optimizer = torch.optim.SGD(per_param_args, lr=lr, momentum=momentum, weight_decay=weight_decay,

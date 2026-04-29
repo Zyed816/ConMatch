@@ -19,6 +19,24 @@ from datasets.ssl_dataset import SSL_Dataset, ImageNetLoader
 from datasets.data_utils import get_data_loader
 
 import pdb
+
+
+def _is_empty_path(path):
+    return path is None or path == '' or str(path).lower() == 'none'
+
+
+def _resolve_load_path(args, path_attr, dir_attr, model_attr):
+    load_path = getattr(args, path_attr, None)
+    if not _is_empty_path(load_path):
+        return load_path
+
+    load_dir = getattr(args, dir_attr, None)
+    load_model = getattr(args, model_attr, None)
+    if _is_empty_path(load_dir) or _is_empty_path(load_model):
+        return None
+    return os.path.join(load_dir, load_model)
+
+
 def main(args):
     '''
     For (Distributed)DataParallelism,
@@ -27,18 +45,18 @@ def main(args):
 
 
     if args.resume:
-        args.load_path = os.path.join(args.load_dir, args.load_model)
-        args.loaded_it = torch.load(args.load_path)['it']
-        args.save_name = args.save_name + '_{}'.format('pretrained_con')        
+        args.load_path = _resolve_load_path(args, 'load_path', 'load_dir', 'load_model')
         if args.load_path is None:
-            raise Exception('Resume of training requires --load_path in the args')
-        
+            raise Exception('Resume of training requires --load_path or --load_dir/--load_model in the args')
+        args.loaded_it = torch.load(args.load_path)['it']
+        args.save_name = args.save_name + '_{}'.format('pretrained_con')
+
         if args.resume_con:
-            args.load_path_con = os.path.join(args.load_dir_con, args.load_model_con)
+            args.load_path_con = _resolve_load_path(args, 'load_path_con', 'load_dir_con', 'load_model_con')
+            if args.load_path_con is None:
+                raise Exception('Resume of confidence training requires --load_path_con or --load_dir_con/--load_model_con in the args')
             args.loaded_it = torch.load(args.load_path)['it']
             args.save_name = args.save_name + '_{}'.format('pretrained_semi')
-            if args.load_path_con is None:
-                raise Exception('Resume of training requires --load_path in the args')
     else:
         args.save_name = args.save_name + '_{}'.format('ETE')        
     save_path = os.path.join(args.save_dir, args.save_name)
@@ -212,6 +230,7 @@ def main_worker(gpu, ngpus_per_node, args):
         model.con_estimator.cuda(args.gpu)
     else:
         model.model = torch.nn.DataParallel(model.model).cuda()
+        model.con_estimator = model.con_estimator.cuda()
 
     import copy
     model.ema_model = copy.deepcopy(model.model)
@@ -219,7 +238,7 @@ def main_worker(gpu, ngpus_per_node, args):
     logger.info(f"model_arch: {model}")
     logger.info(f"Arguments: {args}")
 
-    cudnn.benchmark = True
+    cudnn.benchmark = args.seed is None
     if args.rank != 0:
         torch.distributed.barrier()
  

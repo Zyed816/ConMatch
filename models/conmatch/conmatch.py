@@ -169,7 +169,8 @@ class Con_estimator(nn.Module):
 
         self.proj_feat = nn.Sequential(nn.Linear(128, 64),
                                         nn.ReLU())                                                
-        self.proj_cls = nn.Sequential(nn.Linear(num_class, 64),
+        cls_dim = self.topk if self.topk else num_class
+        self.proj_cls = nn.Sequential(nn.Linear(cls_dim, 64),
                                         nn.ReLU())
         self.con_estimator = nn.Sequential(nn.Linear(128, 64), 
                                             nn.ReLU(), 
@@ -181,8 +182,6 @@ class Con_estimator(nn.Module):
 
 
     def forward(self, x):
-        device = torch.cuda.current_device()
-        
         feat, logits = x[0].detach(), x[1].detach()
         #feat: L2norm, logit: softmax
         feat = self.l2norm(feat)
@@ -191,6 +190,8 @@ class Con_estimator(nn.Module):
             bz, cls_num = class_prob.shape
             topk_index = torch.topk(class_prob, k=self.topk, dim=1)[1]
             topk_val = torch.topk(class_prob, k=self.topk, dim=1)[0]
+        else:
+            topk_val = class_prob
 
         projected_feat = self.proj_feat(feat)
         projected_class_prob = self.proj_cls(topk_val)
@@ -219,7 +220,8 @@ class Con_estimator_2(nn.Module):
 
         self.proj_feat = nn.Sequential(nn.Linear(128, 64),
                                         nn.ReLU())                                                
-        self.proj_cls = nn.Sequential(nn.Linear(self.topk, 64),
+        cls_dim = self.topk if self.topk else num_class
+        self.proj_cls = nn.Sequential(nn.Linear(cls_dim, 64),
                                         nn.ReLU())
         self.con_estimator = nn.Sequential(nn.Linear(128, 64), 
                                             nn.ReLU(), 
@@ -231,8 +233,6 @@ class Con_estimator_2(nn.Module):
         torch.nn.init.zeros_(self.last_layer.bias)
             
     def forward(self, x):
-        device = torch.cuda.current_device()
-        
         feat, logits = x[0].detach(), x[1].detach()
         #feat: L2norm, logit: softmax
         feat = self.l2norm(feat)
@@ -241,6 +241,8 @@ class Con_estimator_2(nn.Module):
             bz, cls_num = class_prob.shape
             topk_index = torch.topk(class_prob, k=self.topk, dim=1)[1]
             topk_val = torch.topk(class_prob, k=self.topk, dim=1)[0]
+        else:
+            topk_val = class_prob
 
         projected_feat = self.proj_feat(feat)
         projected_class_prob = self.proj_cls(topk_val)
@@ -452,24 +454,26 @@ class ConMatch2:
             inputs = torch.cat((x_lb, x_ulb_w, x_ulb_s1, x_ulb_s2))
             ulb_last_index = num_lb + num_ulb*3
 
-            feat, logits = self.model(inputs, is_tuple=True)
-            if args.is_negative_pair:
-                ulb_last_index = -num_lb
-                y_lb_neg_pair_index = []
-                y_lb_array = y_lb.cpu().detach().numpy()
-                for i in range(num_lb):
-                    y_lb_neg_cand = np.where(y_lb_array != y_lb_array[i])[0]
-                    y_lb_neg_index = np.random.choice(y_lb_neg_cand, 1)
-                    y_lb_neg_pair_index.append(np.asscalar(y_lb_neg_index))
-                feat = torch.cat([feat, feat[0:num_lb]], dim=0)
-                logits = torch.cat([logits, logits[y_lb_neg_pair_index]], dim=0)
+            with amp_cm():
+                feat, logits = self.model(inputs, is_tuple=True)
+                if args.is_negative_pair:
+                    ulb_last_index = -num_lb
+                    y_lb_neg_pair_index = []
+                    y_lb_array = y_lb.cpu().detach().numpy()
+                    for i in range(num_lb):
+                        y_lb_neg_cand = np.where(y_lb_array != y_lb_array[i])[0]
+                        y_lb_neg_index = np.random.choice(y_lb_neg_cand, 1)
+                        y_lb_neg_pair_index.append(np.asscalar(y_lb_neg_index))
+                    feat = torch.cat([feat, feat[0:num_lb]], dim=0)
+                    logits = torch.cat([logits, logits[y_lb_neg_pair_index]], dim=0)
+                model_output = (feat, logits)
+                con_output = self.con_estimator(model_output)
+            logits = logits.float()
+            con_output = con_output.float()
 
             # hyper-params for update
             T = self.t_fn(self.it)
-            p_cutoff = self.p_fn(self.it)            
-            
-            model_output = (feat, logits)
-            con_output = self.con_estimator(model_output)
+            p_cutoff = self.p_fn(self.it)
             #w/o nonlinear stretching
             # con_output = 1 / (1 + torch.exp(self.epsilon * (con_output_temp - p_cutoff)))
 
@@ -750,9 +754,8 @@ class ConMatch2:
             x, y = x.cuda(args.gpu), y.cuda(args.gpu)
             num_batch = x.shape[0]
             total_num += num_batch
-            if 'fusion' in self.con_net:
-                feat, logits = self.model(x, is_tuple = True)
-                model_output = (feat, logits)             
+            feat, logits = self.model(x, is_tuple=True)
+            model_output = (feat, logits)
             
             loss = F.cross_entropy(logits, y, reduction='mean')
             logits_list = logits.clone().tolist()
@@ -934,6 +937,9 @@ class ConMatch2:
         for i in range(1, nu + 1):
             xy[0][i], xy[i][i] = xy[i][i], xy[0][i]
         return [torch.cat(v, dim=0) for v in xy]
+
+
+ConMatch = ConMatch2
 
 
 if __name__ == "__main__":

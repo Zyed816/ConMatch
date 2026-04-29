@@ -7,6 +7,25 @@ from utils import net_builder
 from datasets.ssl_dataset import SSL_Dataset
 from datasets.data_utils import get_data_loader
 
+
+def _strip_module_prefix(state_dict):
+    if not any(key.startswith('module.') for key in state_dict):
+        return state_dict
+    return {key[len('module.'):]: value for key, value in state_dict.items()}
+
+
+def _select_state_dict(checkpoint, use_train_model):
+    if use_train_model:
+        for key in ['train_model', 'model']:
+            if key in checkpoint:
+                return checkpoint[key]
+    else:
+        for key in ['eval_model', 'ema_model', 'model']:
+            if key in checkpoint:
+                return checkpoint[key]
+    raise KeyError('No compatible model state dict found in checkpoint.')
+
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
@@ -33,24 +52,27 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     checkpoint_path = os.path.join(args.load_path)
-    checkpoint = torch.load(checkpoint_path)
-    load_model = checkpoint['train_model'] if args.use_train_model else checkpoint['eval_model']
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+    load_model = _strip_module_prefix(_select_state_dict(checkpoint, args.use_train_model))
     
     _net_builder = net_builder(args.net, 
                                args.net_from_name,
-                               {'depth': args.depth, 
-                                'widen_factor': args.widen_factor,
-                                'leaky_slope': args.leaky_slope,
-                                'dropRate': args.dropout,
-                                'use_embed': False})
-    
+                                {'first_stride': 2 if 'stl' in args.dataset else 1,
+                                 'depth': args.depth,
+                                 'widen_factor': args.widen_factor,
+                                 'leaky_slope': args.leaky_slope,
+                                 'bn_momentum': 1.0 - 0.999,
+                                 'dropRate': args.dropout,
+                                 'use_embed': False})
+
     net = _net_builder(num_classes=args.num_classes)
     net.load_state_dict(load_model)
-    if torch.cuda.is_available():
-        net.cuda()
+    net.to(device)
     net.eval()
-    
-    _eval_dset = SSL_Dataset(name=args.dataset, train=False, data_dir=args.data_dir)
+
+    _eval_dset = SSL_Dataset(args, name=args.dataset, train=False,
+                             num_classes=args.num_classes, data_dir=args.data_dir)
     eval_dset = _eval_dset.get_dset()
     
     eval_loader = get_data_loader(eval_dset,
@@ -59,8 +81,8 @@ if __name__ == "__main__":
  
     acc = 0.0
     with torch.no_grad():
-        for image, target in eval_loader:
-            image = image.type(torch.FloatTensor).cuda()
+        for _, image, target in eval_loader:
+            image = image.float().to(device)
             logit = net(image)
             
             acc += logit.cpu().max(1)[1].eq(target).sum().numpy()

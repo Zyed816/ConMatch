@@ -2,7 +2,9 @@ import os
 import re
 import operator
 import numpy as np
-save_path = r'../saved_models/'
+from pathlib import Path
+
+save_path = Path(__file__).resolve().parent.parent / 'saved_models'
 static_dict = {}
 
 def get_static(file_name):
@@ -64,9 +66,13 @@ def get_static(file_name):
 # str = r"[2021-04-13 15:57:33,078 INFO] 228000 iteration, USE_EMA: True, {'train/sup_loss': tensor(0.0311, device='cuda:0'), 'train/unsup_loss': tensor(0.2391, device='cuda:0'), 'train/total_loss': tensor(0.3913, device='cuda:0'), 'train/mask_ratio': tensor(0.5246, device='cuda:0'), 'lr': 0.028670201217471786, 'train/prefecth_time': 0.0050832958221435545,'train/run_time': 0.315829833984375, 'eval/loss': tensor(1.0763, device='cuda:0'), 'eval/top-1-acc': 0.6306},BEST_EVAL_ACC: 0.9348, at 173000 iters"
 
 statics = {}
+if not save_path.exists():
+    print(f'{save_path} does not exist; run training before summarizing logs.')
+    raise SystemExit(0)
+
 for name in os.listdir(save_path):
-    cur_path = save_path + name
-    if os.path.isdir(cur_path):
+    cur_path = save_path / name
+    if cur_path.is_dir():
         cur_name = name
         for n in os.listdir(cur_path):
             if n == 'log.txt':
@@ -74,7 +80,7 @@ for name in os.listdir(save_path):
                 #    statics[cur_name] = get_static(cur_path + '/' + n)
                 #except:
                 #    print(cur_path,'failed')
-                statics[cur_name] = get_static(cur_path + '/' + n)
+                statics[cur_name] = get_static(cur_path / n)
 statics = sorted(statics.items())
 final_res = {}
 for s in statics:
@@ -108,11 +114,27 @@ for s in statics:
     #print(k,'Last 50 epoch, Top5 acc, mean: ',np.mean(v['Top5_50']), ', std: ', np.std(v['Top5_50']))
     #print(k,'Best epoch, Top1 acc, mean: ',np.mean(v['BestAcc']), ', std: ', np.std(v['BestAcc']))
 
-import xlwt
-
 data_setting=['cifar10_40','cifar10_250','cifar10_4000','cifar100_400','cifar100_2500','cifar100_10000','stl10_40','stl10_250','stl10_1000','svhn_40','svhn_250','svhn_1000']
 show_acc = ['BestAcc','Top1_1','Top1_20','Top1_50','Top5_1','Top5_20','Top5_50']
 algs = ['pimodel','pseudolabel','pseudolabel_flex','meanteacher','vat','mixmatch','remixmatch','uda','uda_flex','fixmatch','flexmatch','fullysupervised']
+try:
+    import xlwt
+except ImportError:
+    import csv
+
+    with open(save_path / 'final_res.csv', 'w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        writer.writerow(['metric', 'algorithm', 'dataset', 'mean', 'std'])
+        for metric in show_acc:
+            for d in data_setting:
+                for alg in algs:
+                    key = alg + '_' + d
+                    if key in final_res and metric in final_res[key]:
+                        values = final_res[key][metric]
+                        writer.writerow([metric, alg, d, np.mean(values), np.std(values)])
+    print('xlwt is not installed; wrote CSV summary to saved_models/final_res.csv')
+    raise SystemExit(0)
+
 workbook = xlwt.Workbook()
 for i in range(len(show_acc)):
     worksheet = workbook.add_sheet(show_acc[i],cell_overwrite_ok=True)
@@ -131,4 +153,4 @@ for i in range(len(show_acc)):
                 #if k.endswith('_'+d)  and k.startswith(alg+'_') and show_acc[i] in v:
                     worksheet.write(algs.index(alg)+1,j+1,str(round(np.mean(v[show_acc[i]]),2))+u"\u00B1"+str(round(np.std(v[show_acc[i]]),2)))
                 
-workbook.save('../saved_models/final_res.xls')
+workbook.save(str(save_path / 'final_res.xls'))
