@@ -4,7 +4,8 @@ load_dir: ./saved_models/
 overwrite: True
 use_tensorboard: True
 epoch: 1
-num_train_iter: 1048576
+# num_train_iter: 1048576
+num_train_iter: 5000
 num_train_sup_iter: 0
 num_train_con_iter: 0
 num_eval_iter: 100
