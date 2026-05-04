@@ -26,6 +26,7 @@ from sklearn.metrics import *
 from sklearn.metrics import classification_report
 # from skimage.util import random_noise
 from copy import deepcopy
+from utils import torch_load_checkpoint
 import sys
 import pdb
 import warnings
@@ -463,7 +464,7 @@ class ConMatch2:
                     for i in range(num_lb):
                         y_lb_neg_cand = np.where(y_lb_array != y_lb_array[i])[0]
                         y_lb_neg_index = np.random.choice(y_lb_neg_cand, 1)
-                        y_lb_neg_pair_index.append(np.asscalar(y_lb_neg_index))
+                        y_lb_neg_pair_index.append(y_lb_neg_index.item())
                     feat = torch.cat([feat, feat[0:num_lb]], dim=0)
                     logits = torch.cat([logits, logits[y_lb_neg_pair_index]], dim=0)
                 model_output = (feat, logits)
@@ -867,7 +868,7 @@ class ConMatch2:
 
     def load_model(self, load_path):
         device = torch.cuda.current_device()
-        checkpoint = torch.load(load_path, map_location="cuda:{}".format(device))
+        checkpoint = torch_load_checkpoint(load_path, map_location="cuda:{}".format(device))
         res = self.model.load_state_dict(checkpoint['model'], strict=True)
         print(res.missing_keys)
         # assert set(res.missing_keys) == set(["con_classifier.weight", "con_classifier.bias"])
@@ -880,7 +881,7 @@ class ConMatch2:
         
     def load_model_2(self, load_path):
         device = torch.cuda.current_device()
-        checkpoint = torch.load(load_path, map_location="cuda:{}".format(device))
+        checkpoint = torch_load_checkpoint(load_path, map_location="cuda:{}".format(device))
         res = self.model.load_state_dict(checkpoint['model'], strict=True)
         print(res.missing_keys)
         # assert set(res.missing_keys) == set(["con_classifier.weight", "con_classifier.bias"])
@@ -891,7 +892,7 @@ class ConMatch2:
         
     def load_model_3(self, load_path):
         device = torch.cuda.current_device()
-        checkpoint = torch.load(load_path, map_location="cuda:{}".format(device))
+        checkpoint = torch_load_checkpoint(load_path, map_location="cuda:{}".format(device))
      
         res = self.model.load_state_dict(checkpoint['model'], strict=True)
         self.ema_model = deepcopy(self.model)        
@@ -909,7 +910,7 @@ class ConMatch2:
 
     def load_model_con(self, load_path):
         device = torch.cuda.current_device()
-        checkpoint = torch.load(load_path, map_location="cuda:{}".format(device))
+        checkpoint = torch_load_checkpoint(load_path, map_location="cuda:{}".format(device))
         res = self.con_estimator.load_state_dict(checkpoint['con_estimator'], strict=True)
         print(res.missing_keys)
         # assert set(res.missing_keys) == set(["con_classifier.weight", "con_classifier.bias"])

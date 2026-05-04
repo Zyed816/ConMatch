@@ -3,7 +3,7 @@ import os
 
 import torch
 
-from utils import net_builder
+from utils import net_builder, torch_load_checkpoint
 from datasets.ssl_dataset import SSL_Dataset
 from datasets.data_utils import get_data_loader
 
@@ -53,7 +53,7 @@ if __name__ == "__main__":
     
     checkpoint_path = os.path.join(args.load_path)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    checkpoint = torch.load(checkpoint_path, map_location=device)
+    checkpoint = torch_load_checkpoint(checkpoint_path, map_location=device)
     load_model = _strip_module_prefix(_select_state_dict(checkpoint, args.use_train_model))
     
     _net_builder = net_builder(args.net, 

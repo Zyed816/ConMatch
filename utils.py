@@ -1,5 +1,6 @@
 import os
 import time
+import torch
 from torch.utils.tensorboard import SummaryWriter
 import logging
 import yaml
@@ -12,6 +13,13 @@ def over_write_args_from_file(args, yml):
         dic = yaml.load(f.read(), Loader=yaml.Loader)
         for k in dic:
             setattr(args, k, dic[k])
+
+
+def torch_load_checkpoint(path, map_location=None):
+    try:
+        return torch.load(path, map_location=map_location, weights_only=False)
+    except TypeError:
+        return torch.load(path, map_location=map_location)
 
 
 def setattr_cls_from_kwargs(cls, kwargs):

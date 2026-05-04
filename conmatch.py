@@ -12,7 +12,7 @@ import torch.backends.cudnn as cudnn
 import torch.distributed as dist
 import torch.multiprocessing as mp
 
-from utils import net_builder, get_logger, count_parameters, over_write_args_from_file
+from utils import net_builder, get_logger, count_parameters, over_write_args_from_file, torch_load_checkpoint
 from train_utils import TBLog, get_optimizer, get_optimizer_con, get_cosine_schedule_with_warmup
 from models.conmatch.conmatch import ConMatch
 from datasets.ssl_dataset import SSL_Dataset, ImageNetLoader
@@ -48,14 +48,14 @@ def main(args):
         args.load_path = _resolve_load_path(args, 'load_path', 'load_dir', 'load_model')
         if args.load_path is None:
             raise Exception('Resume of training requires --load_path or --load_dir/--load_model in the args')
-        args.loaded_it = torch.load(args.load_path)['it']
+        args.loaded_it = torch_load_checkpoint(args.load_path)['it']
         args.save_name = args.save_name + '_{}'.format('pretrained_con')
 
         if args.resume_con:
             args.load_path_con = _resolve_load_path(args, 'load_path_con', 'load_dir_con', 'load_model_con')
             if args.load_path_con is None:
                 raise Exception('Resume of confidence training requires --load_path_con or --load_dir_con/--load_model_con in the args')
-            args.loaded_it = torch.load(args.load_path)['it']
+            args.loaded_it = torch_load_checkpoint(args.load_path)['it']
             args.save_name = args.save_name + '_{}'.format('pretrained_semi')
     else:
         args.save_name = args.save_name + '_{}'.format('ETE')        

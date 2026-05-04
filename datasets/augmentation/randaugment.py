@@ -11,6 +11,9 @@ import torch
 import torch.nn.functional as F
 from PIL import Image
 
+AFFINE_TRANSFORM = (PIL.Image.Transform.AFFINE
+                    if hasattr(PIL.Image, 'Transform') else PIL.Image.AFFINE)
+
 
 def AutoContrast(img, _):
     return PIL.ImageOps.autocontrast(img)
@@ -66,14 +69,14 @@ def ShearX(img, v):  # [-0.3, 0.3]
     #assert -0.3 <= v <= 0.3
     #if random.random() > 0.5:
     #    v = -v
-    return img.transform(img.size, PIL.Image.AFFINE, (1, v, 0, 0, 1, 0))
+    return img.transform(img.size, AFFINE_TRANSFORM, (1, v, 0, 0, 1, 0))
 
 
 def ShearY(img, v):  # [-0.3, 0.3]
     #assert -0.3 <= v <= 0.3
     #if random.random() > 0.5:
     #    v = -v
-    return img.transform(img.size, PIL.Image.AFFINE, (1, 0, 0, v, 1, 0))
+    return img.transform(img.size, AFFINE_TRANSFORM, (1, 0, 0, v, 1, 0))
 
 
 def TranslateX(img, v):  # [-150, 150] => percentage: [-0.45, 0.45]
@@ -81,14 +84,14 @@ def TranslateX(img, v):  # [-150, 150] => percentage: [-0.45, 0.45]
     #if random.random() > 0.5:
     #    v = -v
     v = v * img.size[0]
-    return img.transform(img.size, PIL.Image.AFFINE, (1, 0, v, 0, 1, 0))
+    return img.transform(img.size, AFFINE_TRANSFORM, (1, 0, v, 0, 1, 0))
 
 
 def TranslateXabs(img, v):  # [-150, 150] => percentage: [-0.45, 0.45]
     #assert v >= 0.0
     #if random.random() > 0.5:
     #    v = -v
-    return img.transform(img.size, PIL.Image.AFFINE, (1, 0, v, 0, 1, 0))
+    return img.transform(img.size, AFFINE_TRANSFORM, (1, 0, v, 0, 1, 0))
 
 
 def TranslateY(img, v):  # [-150, 150] => percentage: [-0.45, 0.45]
@@ -96,14 +99,14 @@ def TranslateY(img, v):  # [-150, 150] => percentage: [-0.45, 0.45]
     #if random.random() > 0.5:
     #    v = -v
     v = v * img.size[1]
-    return img.transform(img.size, PIL.Image.AFFINE, (1, 0, 0, 0, 1, v))
+    return img.transform(img.size, AFFINE_TRANSFORM, (1, 0, 0, 0, 1, v))
 
 
 def TranslateYabs(img, v):  # [-150, 150] => percentage: [-0.45, 0.45]
     #assert 0 <= v
     #if random.random() > 0.5:
     #    v = -v
-    return img.transform(img.size, PIL.Image.AFFINE, (1, 0, 0, 0, 1, v))
+    return img.transform(img.size, AFFINE_TRANSFORM, (1, 0, 0, 0, 1, v))
 
 
 def Solarize(img, v):  # [0, 256]
